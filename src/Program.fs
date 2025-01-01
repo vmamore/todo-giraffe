@@ -46,6 +46,7 @@ let renderWithBaseLayout
     = 
     html [] [
         head [] [
+            title [] [str "MyTodoApp"]
             meta [
                 _charset "UTF-8";
                 _name "viewport";
@@ -78,6 +79,8 @@ let renderIndexPage
                             li [] [ str (i.Description.ToString()) ]
                         )
                 ]
+                hr []
+                a [ _href "/todo"] [ str "Create New Todo" ]
             ]
             
         return 
@@ -104,6 +107,21 @@ let renderDetailPageMarkup
     renderWithBaseLayout
         [] 
         [ itemMarkup ]
+        []
+        
+let renderCreateTodoPageMarkup : XmlNode 
+    =
+    let createTodoMarkup = 
+        div [] [
+            form [_action "/todo"; _method "post"] [
+                input [_placeholder "Todo Description"; _type "text"; _name "description"; _id "description"]
+                button [ _type "Submit" ] [ str "Enviar" ]
+            ]
+        ]
+     
+    renderWithBaseLayout
+        [] 
+        [ createTodoMarkup ]
         []
     
     
@@ -141,11 +159,41 @@ let detailHttpHandler
         }
     )
     
+let showCreateHttpHandler=
+    handleContext( fun (ctx: HttpContext) -> 
+        task {
+            return! 
+                renderCreateTodoPageMarkup
+                |> RenderView.AsString.htmlNode
+                |> ctx.WriteHtmlStringAsync
+        }
+    )
+    
+let createTodoHttpHandler=
+    handleContext( fun (ctx: HttpContext) -> 
+        task {
+            let description = ctx.Request.Form.Item "description" 
+            
+            todoRepo.Create description |> ignore
+                
+            let! indexPageMarkup = renderIndexPage(todoRepo.GetAll())
+            
+            return! 
+                indexPageMarkup
+                |> RenderView.AsString.htmlNode
+                |> ctx.WriteHtmlStringAsync
+        }
+    )
+    
 let endpoints =
     [ 
         GET [ 
-            route "/" (getAllHttpHandler) 
+            route "/" (getAllHttpHandler)
+            route "/todo" (showCreateHttpHandler)
             routef "/detail/%s" detailHttpHandler   
+        ]
+        POST [
+            route "/todo" (createTodoHttpHandler)
         ]
     ]
 
